@@ -36,12 +36,6 @@ The API will be available at:
 
 ## Run tests
 
-Make sure the project dependencies are installed:
-
-```bash
-pip install -r requirements.txt
-```
-
 Then run the unit tests from the project root:
 
 ```bash
