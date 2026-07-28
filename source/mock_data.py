@@ -1,4 +1,7 @@
-from models import *
+try:
+    from .models import *
+except ImportError:  # pragma: no cover - supports direct script execution
+    from models import *
 
 machine_status=MachineStatus()
 engineering_status=EngineeringStatus()

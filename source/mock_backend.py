@@ -1,6 +1,11 @@
 import threading, time
-from models import *
-from mock_data import *
+
+try:
+    from .models import *
+    from .mock_data import *
+except ImportError:  # pragma: no cover - supports direct script execution
+    from models import *
+    from mock_data import *
 
 class MockBackend:
     def __init__(self):

@@ -1,9 +1,15 @@
 from fastapi import FastAPI, HTTPException, status
 
-from backend_base import MachineBackend
-from configuration import BACKEND_MODE
-from mock_backend import MockBackend
-from models import *
+try:
+    from .backend_base import MachineBackend
+    from .configuration import BACKEND_MODE
+    from .mock_backend import MockBackend
+    from .models import *
+except ImportError:  # pragma: no cover - supports direct script execution
+    from backend_base import MachineBackend
+    from configuration import BACKEND_MODE
+    from mock_backend import MockBackend
+    from models import *
 
 
 # ============================================================
