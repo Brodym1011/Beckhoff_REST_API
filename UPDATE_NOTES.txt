@@ -1,0 +1,12 @@
+PLC contract alignment update
+
+- Added exact enum values from Noah's PLC enumeration reference.
+- Added InvalidCommandSource (10) and InvalidSimulatedSensorState (11).
+- Added EngineeringCommand values 0-12 and engineering command request/status support.
+- Added combined machine snapshot with Machine, EngineeringStatus, Inputs, Outputs,
+  OutputRequests, OutputMismatchStatus, Commands, Door1, Door2, and Dispenser.
+- Added GET /api/v1/machine/snapshot and POST/GET /api/v1/commands/engineering.
+- Added aliases matching the suggested /api/... endpoint wording.
+- Preserved the existing /api/v1 device, machine, and command endpoints.
+- Updated the mock backend so engineering controls change simulated inputs/status.
+- Existing model tests pass.

@@ -1,0 +1,59 @@
+from typing import Any, Protocol
+
+
+class MachineBackend(Protocol):
+    """Interface that every machine backend must provide."""
+
+    def get_system_status(self) -> Any:
+        ...
+
+    def get_snapshot(self) -> Any:
+        ...
+
+    def get_machine_status(self) -> Any:
+        ...
+
+    def get_machine_outputs(self) -> Any:
+        ...
+
+    def get_all_devices(self) -> Any:
+        ...
+
+    def get_door1_status(self) -> Any:
+        ...
+
+    def get_door2_status(self) -> Any:
+        ...
+
+    def get_dispenser_status(self) -> Any:
+        ...
+
+    def get_door1_command(self) -> Any:
+        ...
+
+    def get_door2_command(self) -> Any:
+        ...
+
+    def get_dispenser_command(self) -> Any:
+        ...
+
+    def get_machine_command(self) -> Any:
+        ...
+
+    def get_engineering_command(self) -> Any:
+        ...
+
+    def submit_door1_command(self, request: Any) -> Any:
+        ...
+
+    def submit_door2_command(self, request: Any) -> Any:
+        ...
+
+    def submit_dispenser_command(self, request: Any) -> Any:
+        ...
+
+    def submit_machine_command(self, request: Any) -> Any:
+        ...
+
+    def submit_engineering_command(self, request: Any) -> Any:
+        ...
