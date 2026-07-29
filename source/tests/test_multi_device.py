@@ -3,6 +3,7 @@ from uuid import uuid4
 from urllib.error import URLError
 
 from fastapi.testclient import TestClient
+from PySide6.QtWidgets import QMainWindow
 
 from source.main import app
 from source.device_routing import CommandRouter, DeviceRegistry
@@ -11,10 +12,12 @@ from fake_ipc import (
     BRANDING_PATH,
     DEFAULT_API_BASE_URL,
     DEVICE_OPTIONS,
+    FakeIPC,
     build_action_url,
     build_health_url,
     check_api_health,
     format_action_response,
+    submit_action,
 )
 
 
@@ -174,6 +177,34 @@ def test_ipc_action_url_encodes_each_path_segment():
     assert url == (
         "http://example/api/v1/device%20type/device%2Fname/action%20name"
     )
+
+
+def test_ipc_is_a_pyside6_desktop_window():
+    assert issubclass(FakeIPC, QMainWindow)
+
+
+def test_ipc_submits_selected_action_with_post():
+    expected = {
+        "device_type": "plc",
+        "device_name": "plc",
+        "action": "open_door",
+    }
+
+    def opener(request, timeout):
+        assert request.full_url == "http://example/api/v1/plc/plc/open_door"
+        assert request.get_method() == "POST"
+        assert timeout == 12
+        return FakeHealthResponse(expected)
+
+    result = submit_action(
+        "http://example/api/v1",
+        "plc",
+        "plc",
+        "open_door",
+        opener,
+    )
+
+    assert result == expected
 
 
 def test_ipc_echoes_device_name_and_action_in_response_log():

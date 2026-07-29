@@ -1,15 +1,31 @@
-"""Customer-facing IPC for RESTful multi-device actions."""
+"""Cross-platform PySide6 desktop IPC for RESTful multi-device actions."""
 
 import json
 import os
-import threading
-import tkinter as tk
+import sys
 from datetime import datetime
 from pathlib import Path
-from tkinter import scrolledtext, ttk
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
+
+from PySide6.QtCore import QObject, QRunnable, Qt, QThreadPool, QTimer, Signal, Slot
+from PySide6.QtGui import QFont, QPixmap
+from PySide6.QtWidgets import (
+    QApplication,
+    QComboBox,
+    QFrame,
+    QGridLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMainWindow,
+    QPlainTextEdit,
+    QPushButton,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
+)
 
 
 DEFAULT_API_BASE_URL = os.getenv(
@@ -55,7 +71,6 @@ def build_action_url(
     device_name: str,
     action: str,
 ) -> str:
-    """Build a URL-safe /device-type/device-name/action endpoint."""
     segments = (device_type, device_name, action)
     encoded = "/".join(quote(segment, safe="") for segment in segments)
     return f"{api_base_url.rstrip('/')}/{encoded}"
@@ -68,7 +83,6 @@ def build_health_url(api_base_url: str) -> str:
 
 # Query the API heartbeat and convert failures into customer-readable text.
 def check_api_health(api_base_url: str, opener=urlopen) -> tuple[bool, str]:
-    """Check API availability and return a UI-safe status message."""
     try:
         with opener(build_health_url(api_base_url), timeout=3) as response:
             result = json.loads(response.read().decode())
@@ -79,9 +93,22 @@ def check_api_health(api_base_url: str, opener=urlopen) -> tuple[bool, str]:
         return False, "Unable to connect to the API. Make sure the API is running."
 
 
+# Submit one action and return the decoded API response.
+def submit_action(
+    api_base_url: str,
+    device_type: str,
+    device_name: str,
+    action: str,
+    opener=urlopen,
+) -> dict:
+    url = build_action_url(api_base_url, device_type, device_name, action)
+    request = Request(url, data=b"", method="POST")
+    with opener(request, timeout=12) as response:
+        return json.loads(response.read().decode())
+
+
 # Format the important API response fields for display in the GUI log.
 def format_action_response(result: dict) -> str:
-    """Format the routed fields so they are explicit in the IPC log."""
     return (
         f"device_type={result.get('device_type', 'unknown')} | "
         f"device_name={result.get('device_name', 'unknown')} | "
@@ -91,345 +118,338 @@ def format_action_response(result: dict) -> str:
     )
 
 
-class FakeIPC(tk.Tk):
-    # Initialize window state, selector values, layout, and health monitoring.
+class WorkerSignals(QObject):
+    """Signals emitted by a background API worker."""
+
+    finished = Signal(object)
+    failed = Signal(str)
+
+
+class ApiWorker(QRunnable):
+    """Run a callable in Qt's thread pool and emit its result safely."""
+
+    # Store the callable and arguments that will execute off the GUI thread.
+    def __init__(self, function, *args) -> None:
+        super().__init__()
+        self.function = function
+        self.args = args
+        self.signals = WorkerSignals()
+
+    # Execute the callable and convert exceptions into a Qt failure signal.
+    @Slot()
+    def run(self) -> None:
+        try:
+            self.signals.finished.emit(self.function(*self.args))
+        except HTTPError as exc:
+            detail = exc.read().decode(errors="replace")
+            self.signals.failed.emit(f"API error {exc.code}: {detail}")
+        except (URLError, TimeoutError) as exc:
+            self.signals.failed.emit(f"API unavailable: {exc}")
+        except Exception as exc:
+            self.signals.failed.emit(f"Request failed: {exc}")
+
+
+class FakeIPC(QMainWindow):
+    """Main PySide6 thick-client window."""
+
+    # Initialize window state, widgets, thread pool, and health monitoring.
     def __init__(self) -> None:
         super().__init__()
-        self.title("Multi-Device Demo")
-        self.geometry("1280x720")
-        self.minsize(1000, 600)
-        self.configure(bg="#f4f5f7")
-
-        self.device_type = tk.StringVar(value="Flex")
-        self.device_name = tk.StringVar()
-        self.action = tk.StringVar()
-        self.api_base_url = tk.StringVar(value=DEFAULT_API_BASE_URL)
+        self.setWindowTitle("Multi-Device Demo")
+        self.resize(1280, 760)
+        self.setMinimumSize(1000, 640)
+        self.thread_pool = QThreadPool.globalInstance()
+        self.health_check_running = False
         self._build()
         self._refresh_options()
-        self._schedule_api_check(immediate=True)
 
-    # Construct all visible GUI controls and arrange the dashboard layout.
+        self.health_timer = QTimer(self)
+        self.health_timer.setInterval(API_HEALTH_CHECK_INTERVAL_MS)
+        self.health_timer.timeout.connect(self.check_connection)
+        self.health_timer.start()
+        QTimer.singleShot(0, self.check_connection)
+
+    # Construct all visible widgets and the cross-platform dashboard layout.
     def _build(self) -> None:
-        root = tk.Frame(self, bg="#f4f5f7", padx=48, pady=28)
-        root.pack(fill="both", expand=True)
+        central = QWidget()
+        central.setObjectName("central")
+        self.setCentralWidget(central)
+        root = QVBoxLayout(central)
+        root.setContentsMargins(48, 28, 48, 24)
+        root.setSpacing(16)
 
-        header = tk.Frame(root, bg="#f4f5f7")
-        header.pack(fill="x", pady=(0, 24))
-        for column in range(3):
-            header.grid_columnconfigure(column, weight=1, uniform="header")
-
+        header = QHBoxLayout()
+        header.setSpacing(20)
+        logo = QLabel()
+        logo.setMinimumWidth(280)
         if BRANDING_PATH.exists():
-            self.branding_image = tk.PhotoImage(file=str(BRANDING_PATH)).subsample(8, 8)
-            tk.Label(
-                header,
-                image=self.branding_image,
-                bg="#f4f5f7",
-                bd=0,
-            ).grid(row=0, column=0, sticky="w")
+            pixmap = QPixmap(str(BRANDING_PATH))
+            logo.setPixmap(
+                pixmap.scaled(
+                    270,
+                    82,
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation,
+                )
+            )
+        header.addWidget(logo, 1)
 
-        tk.Label(
-            header,
-            text="Multi-Device Demo",
-            font=("Segoe UI", 28, "bold"),
-            bg="#f4f5f7",
-            fg="#20242a",
-        ).grid(row=0, column=1)
+        title = QLabel("Multi-Device Demo")
+        title.setObjectName("title")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        header.addWidget(title, 1)
 
-        connection = tk.Frame(header, bg="#f4f5f7")
-        connection.grid(row=0, column=2, sticky="e")
-        self.api_status_label = tk.Label(
-            connection,
-            text="●  API Checking",
-            font=("Segoe UI", 11, "bold"),
-            bg="#f4f5f7",
-            fg="#b42318",
+        connection = QVBoxLayout()
+        connection.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self.api_status_label = QLabel("●  API Checking")
+        self.api_status_label.setObjectName("apiUnavailable")
+        self.api_status_label.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self.api_tip_label = QLabel("Unable to connect to the API. Checking connection...")
+        self.api_tip_label.setObjectName("apiTip")
+        self.api_tip_label.setWordWrap(True)
+        self.api_tip_label.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self.api_tip_label.setMaximumWidth(290)
+        connection.addWidget(self.api_status_label)
+        connection.addWidget(self.api_tip_label)
+        header.addLayout(connection, 1)
+        root.addLayout(header)
+
+        run_demo = QPushButton("Run Demo")
+        run_demo.setObjectName("runDemo")
+        run_demo.setEnabled(False)
+        run_demo.setMaximumHeight(44)
+        root.addWidget(run_demo)
+
+        panel = QFrame()
+        panel.setObjectName("actionPanel")
+        panel_layout = QGridLayout(panel)
+        panel_layout.setContentsMargins(28, 22, 28, 18)
+        panel_layout.setHorizontalSpacing(18)
+        panel_layout.setVerticalSpacing(14)
+
+        self.type_combo = self._selector(panel_layout, 0, "Device Type", tuple(DEVICE_OPTIONS))
+        self.name_combo = self._selector(panel_layout, 1, "Device Name", ())
+        self.action_combo = self._selector(panel_layout, 2, "Action", ())
+        self.type_combo.currentTextChanged.connect(self._refresh_options)
+
+        self.execute_button = QPushButton("Execute Action")
+        self.execute_button.setObjectName("executeButton")
+        self.execute_button.setMinimumHeight(48)
+        self.execute_button.clicked.connect(self.execute_action)
+        panel_layout.addWidget(self.execute_button, 2, 0, 1, 3)
+
+        self.status_label = QLabel("Ready")
+        self.status_label.setObjectName("successStatus")
+        self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        panel_layout.addWidget(self.status_label, 3, 0, 1, 3)
+        root.addWidget(panel)
+
+        log_header = QHBoxLayout()
+        log_title = QLabel("API Responses")
+        log_title.setObjectName("sectionTitle")
+        log_header.addWidget(log_title)
+        log_header.addStretch()
+        clear_button = QPushButton("Clear Log")
+        clear_button.setObjectName("secondaryButton")
+        clear_button.clicked.connect(self.clear_log)
+        log_header.addWidget(clear_button)
+        root.addLayout(log_header)
+
+        self.log = QPlainTextEdit()
+        self.log.setReadOnly(True)
+        self.log.setFont(QFont("Courier New", 10))
+        self.log.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        root.addWidget(self.log, 1)
+
+        endpoint = QHBoxLayout()
+        endpoint.addWidget(QLabel("API Endpoint Base URL"))
+        self.api_url_entry = QLineEdit(DEFAULT_API_BASE_URL)
+        self.api_url_entry.setFont(QFont("Courier New", 10))
+        self.api_url_entry.returnPressed.connect(self.check_connection)
+        endpoint.addWidget(self.api_url_entry, 1)
+        check_button = QPushButton("Check Connection")
+        check_button.setObjectName("secondaryButton")
+        check_button.clicked.connect(self.check_connection)
+        endpoint.addWidget(check_button)
+        root.addLayout(endpoint)
+
+        self.setStyleSheet(
+            """
+            QWidget#central { background: #f4f5f7; color: #20242a; }
+            QLabel#title { font-size: 28px; font-weight: 700; }
+            QLabel#sectionTitle { font-size: 16px; font-weight: 700; }
+            QLabel#apiUnavailable { color: #b42318; font-weight: 700; }
+            QLabel#apiConnected { color: #15912a; font-weight: 700; }
+            QLabel#apiTip { color: #7a271a; font-size: 12px; }
+            QLabel#successStatus { color: #15912a; font-weight: 700; }
+            QLabel#workingStatus { color: #c47b00; font-weight: 700; }
+            QLabel#failedStatus { color: #b42318; font-weight: 700; }
+            QFrame#actionPanel { background: white; border: 1px solid #c7cbd1; }
+            QPushButton#runDemo { font-size: 15px; font-weight: 700; }
+            QPushButton#executeButton {
+                background: #064887; color: white; border: 0;
+                font-size: 15px; font-weight: 700; padding: 10px;
+            }
+            QPushButton#executeButton:hover { background: #0b5aa4; }
+            QPushButton#executeButton:disabled { background: #8a9aaa; }
+            QPushButton#secondaryButton {
+                color: #064887; background: white; border: 1px solid #064887;
+                padding: 7px 12px; font-weight: 600;
+            }
+            QComboBox, QLineEdit, QPlainTextEdit {
+                background: white; border: 1px solid #9da3aa; padding: 7px;
+            }
+            """
         )
-        self.api_status_label.pack(anchor="e")
-        self.api_tip_label = tk.Label(
-            connection,
-            text="Unable to connect to the API. Checking connection...",
-            font=("Segoe UI", 9),
-            bg="#f4f5f7",
-            fg="#7a271a",
-            wraplength=260,
-            justify="right",
-        )
-        self.api_tip_label.pack(anchor="e", pady=(3, 0))
 
-        tk.Button(
-            root,
-            text="Run Demo",
-            state="disabled",
-            font=("Segoe UI", 14, "bold"),
-            relief="solid",
-            bd=1,
-            disabledforeground="#666",
-            height=1,
-        ).pack(fill="x", pady=(0, 16), ipady=5)
-
-        action_panel = tk.Frame(
-            root,
-            bg="white",
-            highlightbackground="#c7cbd1",
-            highlightthickness=1,
-            padx=28,
-            pady=22,
-        )
-        action_panel.pack(fill="x")
-        for column in range(3):
-            action_panel.grid_columnconfigure(column, weight=1, uniform="selector")
-
-        self.type_combo = self._selector(
-            action_panel,
-            0,
-            "Device Type",
-            self.device_type,
-            tuple(DEVICE_OPTIONS),
-        )
-        self.name_combo = self._selector(action_panel, 1, "Device Name", self.device_name, ())
-        self.action_combo = self._selector(action_panel, 2, "Action", self.action, ())
-        self.type_combo.bind("<<ComboboxSelected>>", self._refresh_options)
-
-        self.execute_button = tk.Button(
-            action_panel,
-            text="Execute Action",
-            command=self.execute_action,
-            bg="#064887",
-            fg="white",
-            activebackground="#0b5aa4",
-            activeforeground="white",
-            font=("Segoe UI", 14, "bold"),
-            relief="flat",
-            cursor="hand2",
-            height=2,
-        )
-        self.execute_button.grid(row=2, column=0, columnspan=3, sticky="ew", padx=8, pady=(18, 0))
-
-        self.status_label = tk.Label(
-            action_panel,
-            text="Ready",
-            font=("Segoe UI", 12, "bold"),
-            bg="white",
-            fg="#15912a",
-        )
-        self.status_label.grid(row=3, column=0, columnspan=3, pady=(10, 0))
-
-        title_row = tk.Frame(root, bg="#f4f5f7")
-        title_row.pack(fill="x", pady=(22, 8))
-        tk.Label(
-            title_row,
-            text="API Responses",
-            font=("Segoe UI", 15, "bold"),
-            bg="#f4f5f7",
-            fg="#20242a",
-        ).pack(side="left")
-        tk.Button(
-            title_row,
-            text="Clear Log",
-            command=self.clear_log,
-            fg="#064887",
-            font=("Segoe UI", 11, "bold"),
-            relief="solid",
-            bd=1,
-            padx=16,
-        ).pack(side="right")
-
-        endpoint_frame = tk.Frame(root, bg="#f4f5f7")
-        endpoint_frame.pack(side="bottom", fill="x", pady=(12, 0))
-        tk.Label(
-            endpoint_frame,
-            text="API Endpoint Base URL",
-            font=("Segoe UI", 10, "bold"),
-            bg="#f4f5f7",
-            fg="#30343a",
-        ).pack(side="left", padx=(0, 10))
-        self.api_url_entry = tk.Entry(
-            endpoint_frame,
-            textvariable=self.api_base_url,
-            font=("Consolas", 10),
-            relief="solid",
-            bd=1,
-        )
-        self.api_url_entry.pack(side="left", fill="x", expand=True, ipady=5)
-        self.api_url_entry.bind("<Return>", lambda _event: self._start_api_check())
-        tk.Button(
-            endpoint_frame,
-            text="Check Connection",
-            command=self._start_api_check,
-            fg="#064887",
-            font=("Segoe UI", 9, "bold"),
-            relief="solid",
-            bd=1,
-            padx=12,
-        ).pack(side="left", padx=(10, 0), ipady=2)
-
-        self.log = scrolledtext.ScrolledText(
-            root,
-            height=16,
-            font=("Consolas", 11),
-            relief="solid",
-            bd=1,
-            wrap="word",
-            state="disabled",
-        )
-        self.log.pack(fill="both", expand=True)
-
-    # Create one labeled, read-only dropdown used by the action selectors.
-    def _selector(self, parent, column, label, variable, values):
-        frame = tk.Frame(parent, bg="white", padx=8)
-        frame.grid(row=0, column=column, sticky="ew")
-        tk.Label(
-            frame,
-            text=label,
-            font=("Segoe UI", 11, "bold"),
-            bg="white",
-            fg="#30343a",
-        ).pack(anchor="w", pady=(0, 6))
-        combo = ttk.Combobox(
-            frame,
-            textvariable=variable,
-            values=values,
-            state="readonly",
-            font=("Segoe UI", 12),
-        )
-        combo.pack(fill="x", ipady=5)
+    # Create one labeled dropdown and add it to the action grid.
+    def _selector(self, layout: QGridLayout, column: int, label: str, values) -> QComboBox:
+        container = QVBoxLayout()
+        heading = QLabel(label)
+        heading.setStyleSheet("font-weight: 700; border: 0;")
+        combo = QComboBox()
+        combo.addItems(values)
+        container.addWidget(heading)
+        container.addWidget(combo)
+        layout.addLayout(container, 0, column)
         return combo
 
     # Refresh device names and actions when the selected device type changes.
-    def _refresh_options(self, _event=None) -> None:
-        options = DEVICE_OPTIONS[self.device_type.get()]
-        device_names = tuple(options["devices"])
-        actions = tuple(options["actions"])
-        self.name_combo.configure(values=device_names)
-        self.action_combo.configure(values=actions)
-        self.device_name.set(device_names[0])
-        self.action.set(actions[0])
+    @Slot()
+    def _refresh_options(self) -> None:
+        options = DEVICE_OPTIONS[self.type_combo.currentText()]
+        self.name_combo.clear()
+        self.name_combo.addItems(options["devices"])
+        self.action_combo.clear()
+        self.action_combo.addItems(options["actions"])
 
-    # Queue an immediate or delayed API availability check on the Tk event loop.
-    def _schedule_api_check(self, immediate: bool = False) -> None:
-        delay = 0 if immediate else API_HEALTH_CHECK_INTERVAL_MS
-        self.after(delay, self._start_api_check)
-
-    # Start a non-blocking health-check worker using the URL shown in the GUI.
-    def _start_api_check(self) -> None:
-        api_base_url = self.api_base_url.get().strip()
+    # Start a non-blocking health check using the URL shown in the GUI.
+    @Slot()
+    def check_connection(self) -> None:
+        api_base_url = self.api_url_entry.text().strip()
         if not api_base_url:
             self._set_api_status(False, "Unable to connect to the API. Enter an API URL.")
             return
-        threading.Thread(
-            target=self._check_api,
-            args=(api_base_url,),
-            daemon=True,
-        ).start()
+        if self.health_check_running:
+            return
+        self.health_check_running = True
+        worker = ApiWorker(check_api_health, api_base_url)
+        worker.signals.finished.connect(self._health_check_finished)
+        worker.signals.failed.connect(self._health_check_failed)
+        self.thread_pool.start(worker)
 
-    # Perform the network health check outside the GUI thread.
-    def _check_api(self, api_base_url: str) -> None:
-        available, message = check_api_health(api_base_url)
-        try:
-            self.after(0, self._set_api_status, available, message)
-        except tk.TclError:
-            pass
+    # Apply a completed health-check result to the connection indicator.
+    @Slot(object)
+    def _health_check_finished(self, result) -> None:
+        self.health_check_running = False
+        available, message = result
+        self._set_api_status(available, message)
 
-    # Update the green or red API indicator and schedule the next check.
+    # Display worker failures as an unavailable API state.
+    @Slot(str)
+    def _health_check_failed(self, message: str) -> None:
+        self.health_check_running = False
+        self._set_api_status(False, message)
+
+    # Update the green or red API indicator and its connection tip.
     def _set_api_status(self, available: bool, message: str) -> None:
         if available:
-            self.api_status_label.configure(text="●  API Connected", fg="#15912a")
-            self.api_tip_label.configure(text="", fg="#15912a")
+            self.api_status_label.setText("●  API Connected")
+            self.api_status_label.setObjectName("apiConnected")
+            self.api_tip_label.clear()
         else:
-            self.api_status_label.configure(text="●  API Unavailable", fg="#b42318")
-            self.api_tip_label.configure(text=message, fg="#7a271a")
-        self._schedule_api_check()
+            self.api_status_label.setText("●  API Unavailable")
+            self.api_status_label.setObjectName("apiUnavailable")
+            self.api_tip_label.setText(message)
+        self.api_status_label.style().unpolish(self.api_status_label)
+        self.api_status_label.style().polish(self.api_status_label)
 
-    # Remove all existing entries from the API response log.
+    # Remove every entry from the response log.
+    @Slot()
     def clear_log(self) -> None:
-        self.log.configure(state="normal")
-        self.log.delete("1.0", "end")
-        self.log.configure(state="disabled")
+        self.log.clear()
 
     # Append a timestamped route and message to the response log.
     def write_log(self, route: str, message: str) -> None:
-        line = f"[{datetime.now().strftime('%H:%M:%S')}] {route} - {message}\n"
-        self.log.configure(state="normal")
-        self.log.insert("end", line)
-        self.log.see("end")
-        self.log.configure(state="disabled")
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        self.log.appendPlainText(f"[{timestamp}] {route} - {message}")
 
-    # Resolve the selected values and launch the requested action asynchronously.
+    # Resolve the selections and submit the action through Qt's thread pool.
+    @Slot()
     def execute_action(self) -> None:
-        options = DEVICE_OPTIONS[self.device_type.get()]
+        options = DEVICE_OPTIONS[self.type_combo.currentText()]
         device_type = options["api_value"]
-        device_name = options["devices"][self.device_name.get()]
-        action = options["actions"][self.action.get()]
+        device_name = options["devices"][self.name_combo.currentText()]
+        action = options["actions"][self.action_combo.currentText()]
+        api_base_url = self.api_url_entry.text().strip()
         route = f"{device_type}/{device_name}/{action}"
-        api_base_url = self.api_base_url.get().strip()
+
         if not api_base_url:
             self._set_api_status(False, "Unable to connect to the API. Enter an API URL.")
             return
 
-        self.execute_button.configure(state="disabled")
-        self.status_label.configure(text="In Progress", fg="#c47b00")
+        self.execute_button.setEnabled(False)
+        self.status_label.setText("In Progress")
+        self.status_label.setObjectName("workingStatus")
+        self._refresh_status_style()
         self.write_log(route, "Request sent")
-        threading.Thread(
-            target=self._request,
-            args=(api_base_url, device_type, device_name, action),
-            daemon=True,
-        ).start()
 
-    # POST the selected action to the REST API and normalize network failures.
-    def _request(
-        self,
-        api_base_url: str,
-        device_type: str,
-        device_name: str,
-        action: str,
-    ) -> None:
-        url = build_action_url(api_base_url, device_type, device_name, action)
-        route = f"{device_type}/{device_name}/{action}"
-        try:
-            request = Request(url, data=b"", method="POST")
-            with urlopen(request, timeout=12) as response:
-                result = json.loads(response.read().decode())
-            response_route = "/".join(
-                (
-                    result.get("device_type", device_type),
-                    result.get("device_name", device_name),
-                    result.get("action", action),
-                )
-            )
-            self.after(
-                0,
-                self._finish,
-                response_route,
-                result.get("status", "failed"),
-                format_action_response(result),
-            )
-        except HTTPError as exc:
-            detail = exc.read().decode(errors="replace")
-            self.after(0, self._finish, route, "failed", f"API error {exc.code}: {detail}")
-        except (URLError, TimeoutError) as exc:
-            self.after(0, self._finish, route, "failed", f"API unavailable: {exc}")
-        except Exception as exc:
-            self.after(0, self._finish, route, "failed", f"Request failed: {exc}")
-
-    # Restore the Execute button and present the action's terminal result.
-    def _finish(self, route: str, status: str, message: str) -> None:
-        colors = {
-            "completed": "#15912a",
-            "timed_out": "#b35a00",
-            "failed": "#b42318",
-        }
-        labels = {
-            "completed": "Successful",
-            "timed_out": "Timed Out",
-            "failed": "Failed",
-        }
-        self.status_label.configure(
-            text=labels.get(status, status.title()),
-            fg=colors.get(status, "#b42318"),
+        worker = ApiWorker(
+            submit_action,
+            api_base_url,
+            device_type,
+            device_name,
+            action,
         )
-        self.execute_button.configure(state="normal")
+        worker.signals.finished.connect(self._action_finished)
+        worker.signals.failed.connect(
+            lambda message, selected_route=route: self._action_failed(selected_route, message)
+        )
+        self.thread_pool.start(worker)
+
+    # Display a successful API response and restore the Execute button.
+    @Slot(object)
+    def _action_finished(self, result: dict) -> None:
+        route = "/".join(
+            (
+                result.get("device_type", "unknown"),
+                result.get("device_name", "unknown"),
+                result.get("action", "unknown"),
+            )
+        )
+        self._finish(route, result.get("status", "failed"), format_action_response(result))
+
+    # Display a failed API request and restore the Execute button.
+    def _action_failed(self, route: str, message: str) -> None:
+        self._finish(route, "failed", message)
+
+    # Present the terminal status and append it to the response log.
+    def _finish(self, route: str, status: str, message: str) -> None:
+        labels = {
+            "completed": ("Successful", "successStatus"),
+            "timed_out": ("Timed Out", "workingStatus"),
+            "failed": ("Failed", "failedStatus"),
+        }
+        label, object_name = labels.get(status, (status.title(), "failedStatus"))
+        self.status_label.setText(label)
+        self.status_label.setObjectName(object_name)
+        self._refresh_status_style()
+        self.execute_button.setEnabled(True)
         self.write_log(route, message)
+
+    # Reapply Qt style rules after changing a status label's object name.
+    def _refresh_status_style(self) -> None:
+        self.status_label.style().unpolish(self.status_label)
+        self.status_label.style().polish(self.status_label)
+
+
+# Create the Qt application and run the desktop event loop.
+def main() -> int:
+    application = QApplication(sys.argv)
+    window = FakeIPC()
+    window.show()
+    return application.exec()
 
 
 if __name__ == "__main__":
-    FakeIPC().mainloop()
+    raise SystemExit(main())
