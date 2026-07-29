@@ -13,6 +13,24 @@ class DeviceTarget(str, Enum):
     tracked_arm = "tracked_arm"
 
 
+class DeviceType(str, Enum):
+    flex = "flex"
+    arm = "arm"
+    plc = "plc"
+
+
+class DeviceActionResponse(BaseModel):
+    device_type: DeviceType
+    device_name: str
+    action: str
+    status: str
+    accepted: bool
+    message: str
+    request_id: str
+    error_code: Optional[str] = None
+    completed_at: datetime
+
+
 class MultiDeviceCommandRequest(BaseModel):
     request_id: str
     target_device: DeviceTarget

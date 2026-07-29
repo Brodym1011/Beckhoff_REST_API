@@ -1,12 +1,22 @@
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
+from urllib.error import URLError
 
 from fastapi.testclient import TestClient
 
 from source.main import app
 from source.device_routing import CommandRouter, DeviceRegistry
 from source.models import DeviceTarget
-from fake_ipc import BRANDING_PATH, build_command_payload
+from fake_ipc import (
+    BRANDING_PATH,
+    DEFAULT_API_BASE_URL,
+    DEVICE_OPTIONS,
+    build_action_url,
+    build_command_payload,
+    build_health_url,
+    check_api_health,
+    format_action_response,
+)
 
 
 client = TestClient(app)
@@ -126,3 +136,109 @@ def test_device_target_contains_exactly_five_approved_ids():
         "static_arm",
         "tracked_arm",
     }
+
+
+def test_ipc_device_and_action_options_match_api_contract():
+    assert DEVICE_OPTIONS == {
+        "Flex": {
+            "api_value": "flex",
+            "devices": {"Flex 1": "flex_1", "Flex 2": "flex_2"},
+            "actions": {"Dispense": "dispense", "Drop Tip": "drop_tip"},
+        },
+        "Arm": {
+            "api_value": "arm",
+            "devices": {
+                "Static Arm": "static_arm",
+                "Tracked Arm": "tracked_arm",
+            },
+            "actions": {
+                "Grab Sample": "grab_sample",
+                "Drop Sample": "drop_sample",
+            },
+        },
+        "PLC": {
+            "api_value": "plc",
+            "devices": {"PLC": "plc"},
+            "actions": {
+                "Open Door": "open_door",
+                "Close Door": "close_door",
+            },
+        },
+    }
+
+
+def test_ipc_builds_restful_action_url():
+    url = build_action_url(
+        "http://127.0.0.1:8000/api/v1/",
+        "arm",
+        "static_arm",
+        "grab_sample",
+    )
+
+    assert url == "http://127.0.0.1:8000/api/v1/arm/static_arm/grab_sample"
+
+
+def test_ipc_echoes_device_name_and_action_in_response_log():
+    summary = format_action_response(
+        {
+            "device_type": "flex",
+            "device_name": "flex_1",
+            "action": "dispense",
+            "status": "completed",
+            "message": "Dispense completed",
+        }
+    )
+
+    assert "device_type=flex" in summary
+    assert "device_name=flex_1" in summary
+    assert "action=dispense" in summary
+    assert "status=completed" in summary
+    assert "message=Dispense completed" in summary
+
+
+class FakeHealthResponse:
+    def __init__(self, payload):
+        import json
+        self.body = json.dumps(payload).encode()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args):
+        return False
+
+    def read(self):
+        return self.body
+
+
+def test_ipc_health_url_uses_api_base_url():
+    assert build_health_url("http://127.0.0.1:8000/api/v1/") == (
+        "http://127.0.0.1:8000/api/v1/system"
+    )
+
+
+def test_ipc_default_api_url_uses_current_host():
+    assert DEFAULT_API_BASE_URL == "http://127.0.0.1:8000/api/v1"
+
+
+def test_ipc_api_indicator_is_green_for_healthy_response():
+    def opener(url, timeout):
+        assert url.endswith("/api/v1/system")
+        assert timeout == 3
+        return FakeHealthResponse({"heartbeat": True})
+
+    available, message = check_api_health("http://example/api/v1", opener)
+
+    assert available is True
+    assert message == "API Connected"
+
+
+def test_ipc_api_indicator_is_red_when_connection_fails():
+    def opener(_url, timeout):
+        assert timeout == 3
+        raise URLError("connection refused")
+
+    available, message = check_api_health("http://example/api/v1", opener)
+
+    assert available is False
+    assert "Unable to connect to the API" in message

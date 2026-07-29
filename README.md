@@ -79,13 +79,73 @@ Without activating the virtual environment:
 .\.venv\Scripts\python.exe fake_ipc.py
 ```
 
-The **Test Flex 1**, **Test Flex 2**, **Test PLC**, **Test Static Arm**, and **Test Tracked Arm** buttons submit requests to:
+The IPC provides three dependent selectors:
+
+- **Device Type** selects Flex, Arm, or PLC.
+- **Device Name** shows only devices belonging to that type.
+- **Action** shows only actions supported by that type.
+
+Click **Execute Action** to submit the selected RESTful route. The button is
+disabled while the request is active, and the final API response is shown in
+the response log. Each completed log entry explicitly echoes the returned
+`device_type`, `device_name`, `action`, `status`, and `message` fields.
+
+The upper-right API indicator checks `/api/v1/system` every five seconds. A
+green light means the API is available. A red light displays an **Unable to
+connect to the API** tip and usually means the API process is not running or
+`IPC_API_BASE_URL` is incorrect.
+
+The compact **API Endpoint Base URL** footer beneath the response log is
+editable and defaults to the current computer at
+`http://127.0.0.1:8000/api/v1`. Enter another host or port when the API runs on
+a different computer, then click **Check Connection**. Action requests
+immediately use the URL currently shown in this field.
+
+## RESTful device actions
+
+Operational device actions use this route shape:
 
 ```text
-POST http://127.0.0.1:8000/api/v1/commands
+POST /api/v1/{device_type}/{device_name}/{action}
 ```
 
-The selected button is disabled while its request is running. Its status and the final API message are shown in the IPC window.
+Each supported device-type/action pair has its own named FastAPI function:
+`flex_dispense`, `flex_drop_tip`, `arm_grab_sample`, `arm_drop_sample`,
+`plc_open_door`, and `plc_close_door`. Unsupported action paths return HTTP
+404. Invalid device types and device names also return HTTP 404 with a
+standardized `error_code` and message.
+
+URL values are lowercase and use underscores instead of spaces.
+
+| Device type | Device names | Supported actions |
+| --- | --- | --- |
+| `flex` | `flex_1`, `flex_2` | `dispense`, `drop_tip` |
+| `arm` | `static_arm`, `tracked_arm` | `grab_sample`, `drop_sample` |
+| `plc` | `plc` | `open_door`, `close_door` |
+
+Examples:
+
+```powershell
+Invoke-RestMethod -Method Post http://127.0.0.1:8000/api/v1/flex/flex_1/dispense
+Invoke-RestMethod -Method Post http://127.0.0.1:8000/api/v1/arm/static_arm/grab_sample
+Invoke-RestMethod -Method Post http://127.0.0.1:8000/api/v1/plc/plc/open_door
+```
+
+A successful response includes the routed values:
+
+```json
+{
+  "device_type": "flex",
+  "device_name": "flex_1",
+  "action": "dispense",
+  "status": "completed",
+  "accepted": true,
+  "message": "Dispense completed",
+  "request_id": "<uuid>",
+  "error_code": null,
+  "completed_at": "<UTC timestamp>"
+}
+```
 
 ## Configure mock results
 
@@ -117,10 +177,11 @@ Environment variables apply only to the PowerShell window in which they are set.
 
 ## Use a different API address
 
-The IPC defaults to `http://127.0.0.1:8000/api/v1/commands`. To use another address, set `IPC_API_URL` in the IPC terminal before starting the GUI:
+The IPC defaults to `http://127.0.0.1:8000/api/v1`. To use another API base
+address, set `IPC_API_BASE_URL` in the IPC terminal before starting the GUI:
 
 ```powershell
-$env:IPC_API_URL="http://192.168.1.50:8000/api/v1/commands"
+$env:IPC_API_BASE_URL="http://192.168.1.50:8000/api/v1"
 python fake_ipc.py
 ```
 
@@ -144,7 +205,9 @@ The tests cover the existing PLC API and routing for all five multi-device targe
 
 ### The IPC reports that the API is unavailable
 
-Confirm that Terminal 1 is still running and open http://127.0.0.1:8000/docs in a browser. Also check that `IPC_API_URL` points to the `/api/v1/commands` endpoint.
+Confirm that Terminal 1 is still running and open http://127.0.0.1:8000/docs
+in a browser. Also check that `IPC_API_BASE_URL` points to the `/api/v1` base
+path.
 
 ### `python` is not recognized
 

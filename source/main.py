@@ -5,13 +5,13 @@ try:
     from .configuration import BACKEND_MODE
     from .mock_backend import MockBackend
     from .models import *
-    from .device_routing import router
+    from .device_routing import DEVICE_NAMES, router
 except ImportError:  # pragma: no cover - supports direct script execution
     from backend_base import MachineBackend
     from configuration import BACKEND_MODE
     from mock_backend import MockBackend
     from models import *
-    from device_routing import router
+    from device_routing import DEVICE_NAMES, router
 
 
 # ============================================================
@@ -334,6 +334,128 @@ def submit_multi_device_command(request: MultiDeviceCommandRequest):
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail={"error_code": str(exc), "message": "Device adapter is not registered"},
         ) from exc
+
+
+def execute_device_action(
+    device_type: DeviceType,
+    device_name: str,
+    action: str,
+):
+    """Shared routing and error normalization for explicit action routes."""
+    try:
+        return router.route_action(device_type, device_name, action)
+    except LookupError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "error_code": str(exc),
+                "message": (
+                    f"Device {device_name} does not belong to device type "
+                    f"{device_type.value}"
+                ),
+            },
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error_code": str(exc),
+                "message": "Action is not supported for this device type",
+            },
+        ) from exc
+
+
+@app.post(
+    f"{API_PREFIX}/flex/{{device_name}}/dispense",
+    response_model=DeviceActionResponse,
+    tags=["Flex Actions"],
+    summary="Dispense with a named Flex device",
+)
+def flex_dispense(device_name: str):
+    return execute_device_action(DeviceType.flex, device_name, "dispense")
+
+
+@app.post(
+    f"{API_PREFIX}/flex/{{device_name}}/drop_tip",
+    response_model=DeviceActionResponse,
+    tags=["Flex Actions"],
+    summary="Drop the tip from a named Flex device",
+)
+def flex_drop_tip(device_name: str):
+    return execute_device_action(DeviceType.flex, device_name, "drop_tip")
+
+
+@app.post(
+    f"{API_PREFIX}/arm/{{device_name}}/grab_sample",
+    response_model=DeviceActionResponse,
+    tags=["Arm Actions"],
+    summary="Grab a sample with a named arm",
+)
+def arm_grab_sample(device_name: str):
+    return execute_device_action(DeviceType.arm, device_name, "grab_sample")
+
+
+@app.post(
+    f"{API_PREFIX}/arm/{{device_name}}/drop_sample",
+    response_model=DeviceActionResponse,
+    tags=["Arm Actions"],
+    summary="Drop a sample with a named arm",
+)
+def arm_drop_sample(device_name: str):
+    return execute_device_action(DeviceType.arm, device_name, "drop_sample")
+
+
+@app.post(
+    f"{API_PREFIX}/plc/{{device_name}}/open_door",
+    response_model=DeviceActionResponse,
+    tags=["PLC Actions"],
+    summary="Open a door through a named PLC",
+)
+def plc_open_door(device_name: str):
+    return execute_device_action(DeviceType.plc, device_name, "open_door")
+
+
+@app.post(
+    f"{API_PREFIX}/plc/{{device_name}}/close_door",
+    response_model=DeviceActionResponse,
+    tags=["PLC Actions"],
+    summary="Close a door through a named PLC",
+)
+def plc_close_door(device_name: str):
+    return execute_device_action(DeviceType.plc, device_name, "close_door")
+
+
+@app.post(
+    f"{API_PREFIX}/{{device_type}}/{{device_name}}/{{action}}",
+    tags=["Device Actions"],
+    include_in_schema=False,
+)
+def reject_invalid_device_action(
+    device_type: str,
+    device_name: str,
+    action: str,
+):
+    """Return a consistent 404 for action paths not registered above."""
+    valid_types = {item.value for item in DeviceType}
+    if device_type not in valid_types:
+        error_code = "UNKNOWN_DEVICE_TYPE"
+        message = f"Unknown device type: {device_type}"
+    else:
+        typed_names = DEVICE_NAMES[DeviceType(device_type)]
+        if device_name not in typed_names:
+            error_code = "UNKNOWN_DEVICE"
+            message = (
+                f"Device {device_name} does not belong to device type "
+                f"{device_type}"
+            )
+        else:
+            error_code = "UNSUPPORTED_ACTION"
+            message = f"Action {action} is not supported for {device_type}"
+
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail={"error_code": error_code, "message": message},
+    )
 
 @app.post(
     f"{API_PREFIX}/commands/door1",
