@@ -1,7 +1,58 @@
-from enum import IntEnum
+from datetime import datetime
+from enum import Enum, IntEnum
 from typing import Any, Optional
 
-from pydantic import AliasChoices, BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field, field_validator
+
+
+class DeviceTarget(str, Enum):
+    flex_1 = "flex_1"
+    flex_2 = "flex_2"
+    plc = "plc"
+    static_arm = "static_arm"
+    tracked_arm = "tracked_arm"
+
+
+class MultiDeviceCommandRequest(BaseModel):
+    request_id: str
+    target_device: DeviceTarget
+    command: str
+    parameters: dict[str, Any] = Field(default_factory=dict)
+    source: str
+    timestamp: datetime
+    timeout_ms: int = Field(default=10000, ge=100, le=60000)
+
+    @field_validator("request_id")
+    @classmethod
+    def request_id_must_be_uuid(cls, value: str) -> str:
+        from uuid import UUID
+        UUID(value)
+        return value
+
+    @field_validator("command")
+    @classmethod
+    def command_must_be_communication_test(cls, value: str) -> str:
+        if value != "communication_test":
+            raise ValueError("command must be communication_test")
+        return value
+
+    @field_validator("source")
+    @classmethod
+    def source_must_be_fake_ipc(cls, value: str) -> str:
+        if value != "fake_ipc":
+            raise ValueError("source must be fake_ipc")
+        return value
+
+
+class MultiDeviceCommandResponse(BaseModel):
+    request_id: str
+    target_device: DeviceTarget
+    command: str = "communication_test"
+    status: str
+    accepted: bool
+    message: str
+    error_code: Optional[str] = None
+    completed_at: datetime
 
 
 # ============================================================

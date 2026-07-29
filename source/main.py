@@ -5,11 +5,13 @@ try:
     from .configuration import BACKEND_MODE
     from .mock_backend import MockBackend
     from .models import *
+    from .device_routing import router
 except ImportError:  # pragma: no cover - supports direct script execution
     from backend_base import MachineBackend
     from configuration import BACKEND_MODE
     from mock_backend import MockBackend
     from models import *
+    from device_routing import router
 
 
 # ============================================================
@@ -317,6 +319,21 @@ def ceng():
 # ============================================================
 # Command submission
 # ============================================================
+
+@app.post(
+    f"{API_PREFIX}/commands",
+    response_model=MultiDeviceCommandResponse,
+    tags=["Multi-Device Commands"],
+    summary="Run a device communication test",
+)
+def submit_multi_device_command(request: MultiDeviceCommandRequest):
+    try:
+        return router.route(request)
+    except LookupError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"error_code": str(exc), "message": "Device adapter is not registered"},
+        ) from exc
 
 @app.post(
     f"{API_PREFIX}/commands/door1",
