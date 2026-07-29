@@ -4,13 +4,12 @@ import json
 import os
 import threading
 import tkinter as tk
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from tkinter import scrolledtext, ttk
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
-from uuid import uuid4
 
 
 DEFAULT_API_BASE_URL = os.getenv(
@@ -49,6 +48,7 @@ DEVICE_OPTIONS = {
 }
 
 
+# Build the RESTful URL for a selected device type, name, and action.
 def build_action_url(
     api_base_url: str,
     device_type: str,
@@ -61,10 +61,12 @@ def build_action_url(
     return f"{api_base_url.rstrip('/')}/{encoded}"
 
 
+# Build the system-health URL from the user-selected API base URL.
 def build_health_url(api_base_url: str) -> str:
     return f"{api_base_url.rstrip('/')}/system"
 
 
+# Query the API heartbeat and convert failures into customer-readable text.
 def check_api_health(api_base_url: str, opener=urlopen) -> tuple[bool, str]:
     """Check API availability and return a UI-safe status message."""
     try:
@@ -77,6 +79,7 @@ def check_api_health(api_base_url: str, opener=urlopen) -> tuple[bool, str]:
         return False, "Unable to connect to the API. Make sure the API is running."
 
 
+# Format the important API response fields for display in the GUI log.
 def format_action_response(result: dict) -> str:
     """Format the routed fields so they are explicit in the IPC log."""
     return (
@@ -88,20 +91,8 @@ def format_action_response(result: dict) -> str:
     )
 
 
-def build_command_payload(target: str, timeout_ms: int = 10000) -> dict:
-    """Build the legacy communication-test envelope."""
-    return {
-        "request_id": str(uuid4()),
-        "target_device": target,
-        "command": "communication_test",
-        "parameters": {},
-        "source": "fake_ipc",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "timeout_ms": timeout_ms,
-    }
-
-
 class FakeIPC(tk.Tk):
+    # Initialize window state, selector values, layout, and health monitoring.
     def __init__(self) -> None:
         super().__init__()
         self.title("Multi-Device Demo")
@@ -117,6 +108,7 @@ class FakeIPC(tk.Tk):
         self._refresh_options()
         self._schedule_api_check(immediate=True)
 
+    # Construct all visible GUI controls and arrange the dashboard layout.
     def _build(self) -> None:
         root = tk.Frame(self, bg="#f4f5f7", padx=48, pady=28)
         root.pack(fill="both", expand=True)
@@ -282,6 +274,7 @@ class FakeIPC(tk.Tk):
         )
         self.log.pack(fill="both", expand=True)
 
+    # Create one labeled, read-only dropdown used by the action selectors.
     def _selector(self, parent, column, label, variable, values):
         frame = tk.Frame(parent, bg="white", padx=8)
         frame.grid(row=0, column=column, sticky="ew")
@@ -302,6 +295,7 @@ class FakeIPC(tk.Tk):
         combo.pack(fill="x", ipady=5)
         return combo
 
+    # Refresh device names and actions when the selected device type changes.
     def _refresh_options(self, _event=None) -> None:
         options = DEVICE_OPTIONS[self.device_type.get()]
         device_names = tuple(options["devices"])
@@ -311,10 +305,12 @@ class FakeIPC(tk.Tk):
         self.device_name.set(device_names[0])
         self.action.set(actions[0])
 
+    # Queue an immediate or delayed API availability check on the Tk event loop.
     def _schedule_api_check(self, immediate: bool = False) -> None:
         delay = 0 if immediate else API_HEALTH_CHECK_INTERVAL_MS
         self.after(delay, self._start_api_check)
 
+    # Start a non-blocking health-check worker using the URL shown in the GUI.
     def _start_api_check(self) -> None:
         api_base_url = self.api_base_url.get().strip()
         if not api_base_url:
@@ -326,6 +322,7 @@ class FakeIPC(tk.Tk):
             daemon=True,
         ).start()
 
+    # Perform the network health check outside the GUI thread.
     def _check_api(self, api_base_url: str) -> None:
         available, message = check_api_health(api_base_url)
         try:
@@ -333,6 +330,7 @@ class FakeIPC(tk.Tk):
         except tk.TclError:
             pass
 
+    # Update the green or red API indicator and schedule the next check.
     def _set_api_status(self, available: bool, message: str) -> None:
         if available:
             self.api_status_label.configure(text="●  API Connected", fg="#15912a")
@@ -342,11 +340,13 @@ class FakeIPC(tk.Tk):
             self.api_tip_label.configure(text=message, fg="#7a271a")
         self._schedule_api_check()
 
+    # Remove all existing entries from the API response log.
     def clear_log(self) -> None:
         self.log.configure(state="normal")
         self.log.delete("1.0", "end")
         self.log.configure(state="disabled")
 
+    # Append a timestamped route and message to the response log.
     def write_log(self, route: str, message: str) -> None:
         line = f"[{datetime.now().strftime('%H:%M:%S')}] {route} - {message}\n"
         self.log.configure(state="normal")
@@ -354,6 +354,7 @@ class FakeIPC(tk.Tk):
         self.log.see("end")
         self.log.configure(state="disabled")
 
+    # Resolve the selected values and launch the requested action asynchronously.
     def execute_action(self) -> None:
         options = DEVICE_OPTIONS[self.device_type.get()]
         device_type = options["api_value"]
@@ -374,6 +375,7 @@ class FakeIPC(tk.Tk):
             daemon=True,
         ).start()
 
+    # POST the selected action to the REST API and normalize network failures.
     def _request(
         self,
         api_base_url: str,
@@ -409,6 +411,7 @@ class FakeIPC(tk.Tk):
         except Exception as exc:
             self.after(0, self._finish, route, "failed", f"Request failed: {exc}")
 
+    # Restore the Execute button and present the action's terminal result.
     def _finish(self, route: str, status: str, message: str) -> None:
         colors = {
             "completed": "#15912a",

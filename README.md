@@ -3,8 +3,9 @@
 This project contains:
 
 - A FastAPI service for the existing Beckhoff PLC-oriented machine model.
-- A multi-device command endpoint that routes communication tests to mock adapters.
-- A customer-facing Python/Tkinter IPC for testing Flex 1, Flex 2, PLC, Static Arm, and Tracked Arm.
+- Six RESTful device-action endpoints backed by configurable mock adapters.
+- A customer-facing Python/Tkinter IPC for selecting and executing Flex, Arm,
+  and PLC actions.
 
 The IPC displays the transparent Ancera branding from
 `assets/ancera_branding_transparent.png` in the upper-left corner.
@@ -64,6 +65,25 @@ Wait until the terminal reports that Uvicorn is running. The API is then availab
 - ReDoc: http://127.0.0.1:8000/redoc
 - System status: http://127.0.0.1:8000/api/v1/system
 
+## OpenAPI documentation
+
+The versioned OpenAPI document is stored at `openapi.json`. It describes the
+RESTful action endpoints, request and response schemas, legacy endpoints, and
+validation responses currently registered by FastAPI.
+
+Regenerate it after changing routes or models:
+
+```powershell
+python scripts\export_openapi.py
+```
+
+When the API is running, the live schema and interactive documentation are
+also available at:
+
+- OpenAPI JSON: http://127.0.0.1:8000/openapi.json
+- Swagger UI: http://127.0.0.1:8000/docs
+- ReDoc: http://127.0.0.1:8000/redoc
+
 ### Terminal 2: start the fake IPC
 
 Open another PowerShell window in the same project root:
@@ -109,11 +129,26 @@ Operational device actions use this route shape:
 POST /api/v1/{device_type}/{device_name}/{action}
 ```
 
+The six registered action routes are:
+
+```text
+POST /api/v1/flex/{device_name}/dispense
+POST /api/v1/flex/{device_name}/drop_tip
+POST /api/v1/arm/{device_name}/grab_sample
+POST /api/v1/arm/{device_name}/drop_sample
+POST /api/v1/plc/{device_name}/open_door
+POST /api/v1/plc/{device_name}/close_door
+```
+
 Each supported device-type/action pair has its own named FastAPI function:
 `flex_dispense`, `flex_drop_tip`, `arm_grab_sample`, `arm_drop_sample`,
 `plc_open_door`, and `plc_close_door`. Unsupported action paths return HTTP
 404. Invalid device types and device names also return HTTP 404 with a
 standardized `error_code` and message.
+
+The older `POST /api/v1/commands` communication-test endpoint remains
+available for backward compatibility, but the GUI uses the six RESTful action
+routes above.
 
 URL values are lowercase and use underscores instead of spaces.
 
@@ -194,7 +229,14 @@ From the project root:
 python -m pytest -q
 ```
 
-The tests cover the existing PLC API and routing for all five multi-device targets.
+The tests cover:
+
+- Existing PLC API behavior
+- All six RESTful action handlers and response fields
+- Invalid device types, names, and actions returning HTTP 404
+- Configurable mock outcomes and adapter routing
+- GUI selector mappings, URL construction, response formatting, branding,
+  and API availability checks
 
 ## Stop the applications
 

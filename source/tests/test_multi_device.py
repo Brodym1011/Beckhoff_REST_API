@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from uuid import UUID, uuid4
+from uuid import uuid4
 from urllib.error import URLError
 
 from fastapi.testclient import TestClient
@@ -12,7 +12,6 @@ from fake_ipc import (
     DEFAULT_API_BASE_URL,
     DEVICE_OPTIONS,
     build_action_url,
-    build_command_payload,
     build_health_url,
     check_api_health,
     format_action_response,
@@ -55,20 +54,6 @@ def test_unsupported_command_is_rejected():
     payload["command"] = "do_something"
     response = client.post("/api/v1/commands", json=payload)
     assert response.status_code == 422
-
-
-def test_ipc_builds_valid_unique_command_envelopes():
-    first = build_command_payload("flex_1")
-    second = build_command_payload("flex_1")
-
-    UUID(first["request_id"])
-    datetime.fromisoformat(first["timestamp"])
-    assert first["request_id"] != second["request_id"]
-    assert first["target_device"] == "flex_1"
-    assert first["command"] == "communication_test"
-    assert first["parameters"] == {}
-    assert first["source"] == "fake_ipc"
-    assert first["timeout_ms"] == 10000
 
 
 def test_ipc_branding_asset_exists_and_is_transparent_png():
@@ -178,6 +163,19 @@ def test_ipc_builds_restful_action_url():
     assert url == "http://127.0.0.1:8000/api/v1/arm/static_arm/grab_sample"
 
 
+def test_ipc_action_url_encodes_each_path_segment():
+    url = build_action_url(
+        "http://example/api/v1",
+        "device type",
+        "device/name",
+        "action name",
+    )
+
+    assert url == (
+        "http://example/api/v1/device%20type/device%2Fname/action%20name"
+    )
+
+
 def test_ipc_echoes_device_name_and_action_in_response_log():
     summary = format_action_response(
         {
@@ -242,3 +240,14 @@ def test_ipc_api_indicator_is_red_when_connection_fails():
 
     assert available is False
     assert "Unable to connect to the API" in message
+
+
+def test_ipc_api_indicator_is_red_for_unhealthy_response():
+    def opener(_url, timeout):
+        assert timeout == 3
+        return FakeHealthResponse({"heartbeat": False})
+
+    available, message = check_api_health("http://example/api/v1", opener)
+
+    assert available is False
+    assert message == "Unable to connect to the API: unhealthy response"

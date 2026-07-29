@@ -45,6 +45,7 @@ DEVICE_ACTIONS = {
 
 
 class DeviceAdapter(Protocol):
+    # Define the communication-test operation required from every adapter.
     def communication_test(self, request: MultiDeviceCommandRequest) -> MultiDeviceCommandResponse: ...
 
 
@@ -54,6 +55,7 @@ class MockDeviceAdapter:
     outcome: str = "success"
     delay_ms: int = 250
 
+    # Simulate a communication check and return the shared legacy response model.
     def communication_test(self, request: MultiDeviceCommandRequest) -> MultiDeviceCommandResponse:
         outcome = os.getenv(f"MOCK_{self.target.value.upper()}_OUTCOME", self.outcome).lower()
         delay_ms = int(os.getenv(f"MOCK_{self.target.value.upper()}_DELAY_MS", self.delay_ms))
@@ -80,12 +82,15 @@ class MockDeviceAdapter:
 
 
 class DeviceRegistry:
+    # Create an empty target-to-adapter lookup table.
     def __init__(self) -> None:
         self._adapters: dict[DeviceTarget, DeviceAdapter] = {}
 
+    # Associate a supported device target with its adapter implementation.
     def register(self, target: DeviceTarget, adapter: DeviceAdapter) -> None:
         self._adapters[target] = adapter
 
+    # Return the adapter for a target or report that it is not registered.
     def get(self, target: DeviceTarget) -> DeviceAdapter:
         try:
             return self._adapters[target]
@@ -94,12 +99,15 @@ class DeviceRegistry:
 
 
 class CommandRouter:
+    # Store the registry used for all command and action routing.
     def __init__(self, registry: DeviceRegistry) -> None:
         self.registry = registry
 
+    # Route a legacy communication-test envelope to its target adapter.
     def route(self, request: MultiDeviceCommandRequest) -> MultiDeviceCommandResponse:
         return self.registry.get(request.target_device).communication_test(request)
 
+    # Validate and execute a RESTful action for a named device.
     def route_action(
         self,
         device_type: DeviceType,

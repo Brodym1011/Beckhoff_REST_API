@@ -18,6 +18,7 @@ except ImportError:  # pragma: no cover - supports direct script execution
 # Backend configuration
 # ============================================================
 
+# Create the configured PLC backend used by all legacy machine endpoints.
 def create_backend() -> MachineBackend:
     if BACKEND_MODE == "mock":
         return MockBackend()
@@ -72,6 +73,7 @@ DISPENSER_COMMANDS = {
 # Shared helpers
 # ============================================================
 
+# Reject commands that are not valid for the selected legacy endpoint.
 def validate(command, allowed_commands):
     if command not in allowed_commands:
         raise HTTPException(
@@ -80,6 +82,7 @@ def validate(command, allowed_commands):
         )
 
 
+# Convert a backend command result into the shared legacy API response.
 def response(command):
     return {
         "accepted": command.accepted,
@@ -320,6 +323,7 @@ def ceng():
 # Command submission
 # ============================================================
 
+# Accept the backward-compatible multi-device communication-test envelope.
 @app.post(
     f"{API_PREFIX}/commands",
     response_model=MultiDeviceCommandResponse,
@@ -336,6 +340,7 @@ def submit_multi_device_command(request: MultiDeviceCommandRequest):
         ) from exc
 
 
+# Route explicit action handlers through one shared validation/error boundary.
 def execute_device_action(
     device_type: DeviceType,
     device_name: str,
@@ -365,6 +370,7 @@ def execute_device_action(
         ) from exc
 
 
+# Execute the dispense action on a named Flex device.
 @app.post(
     f"{API_PREFIX}/flex/{{device_name}}/dispense",
     response_model=DeviceActionResponse,
@@ -375,6 +381,7 @@ def flex_dispense(device_name: str):
     return execute_device_action(DeviceType.flex, device_name, "dispense")
 
 
+# Execute the drop-tip action on a named Flex device.
 @app.post(
     f"{API_PREFIX}/flex/{{device_name}}/drop_tip",
     response_model=DeviceActionResponse,
@@ -385,6 +392,7 @@ def flex_drop_tip(device_name: str):
     return execute_device_action(DeviceType.flex, device_name, "drop_tip")
 
 
+# Execute the grab-sample action on a named arm.
 @app.post(
     f"{API_PREFIX}/arm/{{device_name}}/grab_sample",
     response_model=DeviceActionResponse,
@@ -395,6 +403,7 @@ def arm_grab_sample(device_name: str):
     return execute_device_action(DeviceType.arm, device_name, "grab_sample")
 
 
+# Execute the drop-sample action on a named arm.
 @app.post(
     f"{API_PREFIX}/arm/{{device_name}}/drop_sample",
     response_model=DeviceActionResponse,
@@ -405,6 +414,7 @@ def arm_drop_sample(device_name: str):
     return execute_device_action(DeviceType.arm, device_name, "drop_sample")
 
 
+# Execute the open-door action through the named PLC.
 @app.post(
     f"{API_PREFIX}/plc/{{device_name}}/open_door",
     response_model=DeviceActionResponse,
@@ -415,6 +425,7 @@ def plc_open_door(device_name: str):
     return execute_device_action(DeviceType.plc, device_name, "open_door")
 
 
+# Execute the close-door action through the named PLC.
 @app.post(
     f"{API_PREFIX}/plc/{{device_name}}/close_door",
     response_model=DeviceActionResponse,
@@ -425,6 +436,7 @@ def plc_close_door(device_name: str):
     return execute_device_action(DeviceType.plc, device_name, "close_door")
 
 
+# Return standardized 404 details for all unregistered action paths.
 @app.post(
     f"{API_PREFIX}/{{device_type}}/{{device_name}}/{{action}}",
     tags=["Device Actions"],

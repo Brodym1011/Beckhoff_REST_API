@@ -1,0 +1,1390 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Beckhoff PLC REST API",
+    "description": "Prototype 2 REST API for high-level machine commands and status.\n\nThe PLC is authoritative for command acceptance, execution, physical completion, interlocks, timing, and faults.\n\nAn HTTP 202 response means that a command request was received by the API. It does not mean that the physical operation has completed.",
+    "version": "1.2.0"
+  },
+  "paths": {
+    "/api/v1/system": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Get API and communication status",
+        "description": "Returns REST API version information, backend status, and the API heartbeat. Machine execution and fault state remain authoritative in the PLC.",
+        "operationId": "system_api_v1_system_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/machine/snapshot": {
+      "get": {
+        "tags": [
+          "Machine"
+        ],
+        "summary": "Get complete machine snapshot",
+        "description": "Returns the current machine, engineering, input, output, command, and supported device states in one response.",
+        "operationId": "snapshot_api_v1_machine_snapshot_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/machine/status": {
+      "get": {
+        "tags": [
+          "Machine"
+        ],
+        "summary": "Get machine-level status",
+        "description": "Returns high-level machine readiness, busy state, fault state, simulation state, and most recent fault information.",
+        "operationId": "machine_status_api_v1_machine_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/machine/outputs": {
+      "get": {
+        "tags": [
+          "Machine"
+        ],
+        "summary": "Get semantic machine outputs",
+        "description": "Returns machine-function output names such as door open and close outputs. Physical terminal, channel, and PLC symbol mappings are not part of the public API contract.",
+        "operationId": "machine_outputs_api_v1_machine_outputs_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices": {
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "List supported device states",
+        "description": "Returns status for the currently supported Door 1, Door 2, and dispenser devices.",
+        "operationId": "devices_api_v1_devices_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/door1": {
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Get Door 1 status",
+        "description": "Returns the high-level Door 1 state, position, sensors, command tracking information, and faults.",
+        "operationId": "door1_api_v1_devices_door1_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/door2": {
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Get Door 2 status",
+        "description": "Returns the high-level Door 2 state, position, sensors, command tracking information, and faults.",
+        "operationId": "door2_api_v1_devices_door2_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/dispenser": {
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Get dispenser status",
+        "description": "Returns the currently supported high-level dispenser state. The final dispenser command and EL6001 serial contract remain pending PLC checkpoint verification.",
+        "operationId": "dispenser_api_v1_devices_dispenser_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/igus_axis": {
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Get reserved igus axis contract status",
+        "description": "Reserves the public igus_axis device name for Prototype 2. The final motion command list, position fields, units, speeds, profiles, and drive mapping are intentionally not defined yet.",
+        "operationId": "igus_axis_api_v1_devices_igus_axis_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/commands/door1": {
+      "get": {
+        "tags": [
+          "Command Status"
+        ],
+        "summary": "Get Door 1 command status",
+        "description": "Returns the most recent Door 1 command lifecycle and result.",
+        "operationId": "cd1_api_v1_commands_door1_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Commands"
+        ],
+        "summary": "Submit a Door 1 command",
+        "description": "Submits a high-level Door 1 Open, Close, ResetFault, or ClearCommand request. The PLC controls outputs, sensors, timing, interlocks, completion, and faults.",
+        "operationId": "pd1_api_v1_commands_door1_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommandRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Request received by the API. Physical door operation may still be pending, executing, rejected, or faulted.",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "400": {
+            "description": "Unsupported Door 1 command."
+          },
+          "422": {
+            "description": "Invalid request body or enum value."
+          }
+        }
+      }
+    },
+    "/api/v1/commands/door2": {
+      "get": {
+        "tags": [
+          "Command Status"
+        ],
+        "summary": "Get Door 2 command status",
+        "description": "Returns the most recent Door 2 command lifecycle and result.",
+        "operationId": "cd2_api_v1_commands_door2_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Commands"
+        ],
+        "summary": "Submit a Door 2 command",
+        "description": "Submits a high-level Door 2 Open, Close, ResetFault, or ClearCommand request. The PLC controls outputs, sensors, timing, interlocks, completion, and faults.",
+        "operationId": "pd2_api_v1_commands_door2_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommandRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Request received by the API. Physical door operation may still be pending, executing, rejected, or faulted.",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "400": {
+            "description": "Unsupported Door 2 command."
+          },
+          "422": {
+            "description": "Invalid request body or enum value."
+          }
+        }
+      }
+    },
+    "/api/v1/commands/dispenser": {
+      "get": {
+        "tags": [
+          "Command Status"
+        ],
+        "summary": "Get dispenser command status",
+        "description": "Returns the most recent dispenser command lifecycle and result.",
+        "operationId": "cdisp_api_v1_commands_dispenser_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Commands"
+        ],
+        "summary": "Submit a dispenser command",
+        "description": "Submits a currently supported high-level dispenser request. Raw RS-232 strings and direct EL6001 control are not exposed. The final dispenser contract remains pending PLC verification.",
+        "operationId": "pdisp_api_v1_commands_dispenser_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommandRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Request received by the API. Dispenser completion must be confirmed through command or device status.",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "400": {
+            "description": "Unsupported dispenser command."
+          },
+          "422": {
+            "description": "Invalid request body or enum value."
+          }
+        }
+      }
+    },
+    "/api/v1/commands/machine": {
+      "get": {
+        "tags": [
+          "Command Status"
+        ],
+        "summary": "Get machine command status",
+        "description": "Returns the most recent supported machine-level command lifecycle and result.",
+        "operationId": "cmach_api_v1_commands_machine_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Commands"
+        ],
+        "summary": "Submit a machine-level command",
+        "description": "Submits a supported high-level machine command. Normal motion Stop behavior is not exposed in Prototype 2.",
+        "operationId": "pmach_api_v1_commands_machine_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MachineCommandRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Machine command request received by the API.",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid request body or enum value."
+          }
+        }
+      }
+    },
+    "/api/v1/commands/engineering": {
+      "get": {
+        "tags": [
+          "Command Status"
+        ],
+        "summary": "Get engineering command status",
+        "description": "Returns the most recent engineering-only command lifecycle and result. Engineering behavior is separate from production behavior.",
+        "operationId": "ceng_api_v1_commands_engineering_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Engineering"
+        ],
+        "summary": "Submit an engineering-only command",
+        "description": "Submits simulation and diagnostic commands intended for engineering use only. These operations are not part of normal production behavior.",
+        "operationId": "peng_api_v1_commands_engineering_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EngineeringCommandRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Engineering command request received by the API.",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid request body or enum value."
+          }
+        }
+      }
+    },
+    "/api/v1/commands": {
+      "post": {
+        "tags": [
+          "Multi-Device Commands"
+        ],
+        "summary": "Run a device communication test",
+        "operationId": "submit_multi_device_command_api_v1_commands_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MultiDeviceCommandRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MultiDeviceCommandResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/flex/{device_name}/dispense": {
+      "post": {
+        "tags": [
+          "Flex Actions"
+        ],
+        "summary": "Dispense with a named Flex device",
+        "operationId": "flex_dispense_api_v1_flex__device_name__dispense_post",
+        "parameters": [
+          {
+            "name": "device_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Device Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceActionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/flex/{device_name}/drop_tip": {
+      "post": {
+        "tags": [
+          "Flex Actions"
+        ],
+        "summary": "Drop the tip from a named Flex device",
+        "operationId": "flex_drop_tip_api_v1_flex__device_name__drop_tip_post",
+        "parameters": [
+          {
+            "name": "device_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Device Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceActionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/arm/{device_name}/grab_sample": {
+      "post": {
+        "tags": [
+          "Arm Actions"
+        ],
+        "summary": "Grab a sample with a named arm",
+        "operationId": "arm_grab_sample_api_v1_arm__device_name__grab_sample_post",
+        "parameters": [
+          {
+            "name": "device_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Device Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceActionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/arm/{device_name}/drop_sample": {
+      "post": {
+        "tags": [
+          "Arm Actions"
+        ],
+        "summary": "Drop a sample with a named arm",
+        "operationId": "arm_drop_sample_api_v1_arm__device_name__drop_sample_post",
+        "parameters": [
+          {
+            "name": "device_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Device Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceActionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/plc/{device_name}/open_door": {
+      "post": {
+        "tags": [
+          "PLC Actions"
+        ],
+        "summary": "Open a door through a named PLC",
+        "operationId": "plc_open_door_api_v1_plc__device_name__open_door_post",
+        "parameters": [
+          {
+            "name": "device_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Device Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceActionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/plc/{device_name}/close_door": {
+      "post": {
+        "tags": [
+          "PLC Actions"
+        ],
+        "summary": "Close a door through a named PLC",
+        "operationId": "plc_close_door_api_v1_plc__device_name__close_door_post",
+        "parameters": [
+          {
+            "name": "device_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Device Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceActionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/machine/snapshot": {
+      "get": {
+        "tags": [
+          "Legacy"
+        ],
+        "summary": "Legacy machine snapshot route",
+        "description": "Deprecated compatibility route. Use GET /api/v1/machine/snapshot.",
+        "operationId": "snapshot_api_machine_snapshot_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "deprecated": true
+      }
+    },
+    "/api/devices/door1/commands": {
+      "post": {
+        "tags": [
+          "Legacy"
+        ],
+        "summary": "Legacy Door 1 command route",
+        "description": "Deprecated compatibility route. Use POST /api/v1/commands/door1.",
+        "operationId": "pd1_api_devices_door1_commands_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommandRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "deprecated": true
+      }
+    },
+    "/api/devices/door2/commands": {
+      "post": {
+        "tags": [
+          "Legacy"
+        ],
+        "summary": "Legacy Door 2 command route",
+        "description": "Deprecated compatibility route. Use POST /api/v1/commands/door2.",
+        "operationId": "pd2_api_devices_door2_commands_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommandRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "deprecated": true
+      }
+    },
+    "/api/devices/dispenser/commands": {
+      "post": {
+        "tags": [
+          "Legacy"
+        ],
+        "summary": "Legacy dispenser command route",
+        "description": "Deprecated compatibility route. Use POST /api/v1/commands/dispenser.",
+        "operationId": "pdisp_api_devices_dispenser_commands_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommandRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "deprecated": true
+      }
+    },
+    "/api/machine/commands": {
+      "post": {
+        "tags": [
+          "Legacy"
+        ],
+        "summary": "Legacy machine command route",
+        "description": "Deprecated compatibility route. Use POST /api/v1/commands/machine.",
+        "operationId": "pmach_api_machine_commands_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MachineCommandRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "deprecated": true
+      }
+    },
+    "/api/engineering/commands": {
+      "post": {
+        "tags": [
+          "Legacy"
+        ],
+        "summary": "Legacy engineering command route",
+        "description": "Deprecated compatibility route. Use POST /api/v1/commands/engineering.",
+        "operationId": "peng_api_engineering_commands_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EngineeringCommandRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "deprecated": true
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CommandRequest": {
+        "properties": {
+          "command": {
+            "$ref": "#/components/schemas/DeviceCommand"
+          },
+          "request_id": {
+            "type": "integer",
+            "title": "Request Id"
+          },
+          "source": {
+            "$ref": "#/components/schemas/CommandSource",
+            "default": 2
+          },
+          "parameter1": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parameter1"
+          },
+          "parameter2": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parameter2"
+          }
+        },
+        "type": "object",
+        "required": [
+          "command",
+          "request_id"
+        ],
+        "title": "CommandRequest"
+      },
+      "CommandSource": {
+        "type": "integer",
+        "enum": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "title": "CommandSource"
+      },
+      "DeviceActionResponse": {
+        "properties": {
+          "device_type": {
+            "$ref": "#/components/schemas/DeviceType"
+          },
+          "device_name": {
+            "type": "string",
+            "title": "Device Name"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "accepted": {
+            "type": "boolean",
+            "title": "Accepted"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "completed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Completed At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "device_type",
+          "device_name",
+          "action",
+          "status",
+          "accepted",
+          "message",
+          "request_id",
+          "completed_at"
+        ],
+        "title": "DeviceActionResponse"
+      },
+      "DeviceCommand": {
+        "type": "integer",
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "title": "DeviceCommand"
+      },
+      "DeviceTarget": {
+        "type": "string",
+        "enum": [
+          "flex_1",
+          "flex_2",
+          "plc",
+          "static_arm",
+          "tracked_arm"
+        ],
+        "title": "DeviceTarget"
+      },
+      "DeviceType": {
+        "type": "string",
+        "enum": [
+          "flex",
+          "arm",
+          "plc"
+        ],
+        "title": "DeviceType"
+      },
+      "EngineeringCommand": {
+        "type": "integer",
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          6
+        ],
+        "title": "EngineeringCommand"
+      },
+      "EngineeringCommandRequest": {
+        "properties": {
+          "command": {
+            "$ref": "#/components/schemas/EngineeringCommand"
+          },
+          "request_id": {
+            "type": "integer",
+            "title": "Request Id"
+          },
+          "source": {
+            "$ref": "#/components/schemas/CommandSource",
+            "default": 2
+          },
+          "parameter1": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parameter1"
+          },
+          "parameter2": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parameter2"
+          }
+        },
+        "type": "object",
+        "required": [
+          "command",
+          "request_id"
+        ],
+        "title": "EngineeringCommandRequest"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "MachineCommand": {
+        "type": "integer",
+        "enum": [
+          0,
+          1
+        ],
+        "title": "MachineCommand"
+      },
+      "MachineCommandRequest": {
+        "properties": {
+          "command": {
+            "$ref": "#/components/schemas/MachineCommand"
+          },
+          "request_id": {
+            "type": "integer",
+            "title": "Request Id"
+          },
+          "source": {
+            "$ref": "#/components/schemas/CommandSource",
+            "default": 2
+          }
+        },
+        "type": "object",
+        "required": [
+          "command",
+          "request_id"
+        ],
+        "title": "MachineCommandRequest"
+      },
+      "MultiDeviceCommandRequest": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          },
+          "target_device": {
+            "$ref": "#/components/schemas/DeviceTarget"
+          },
+          "command": {
+            "type": "string",
+            "title": "Command"
+          },
+          "parameters": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Parameters"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "timeout_ms": {
+            "type": "integer",
+            "maximum": 60000.0,
+            "minimum": 100.0,
+            "title": "Timeout Ms",
+            "default": 10000
+          }
+        },
+        "type": "object",
+        "required": [
+          "request_id",
+          "target_device",
+          "command",
+          "source",
+          "timestamp"
+        ],
+        "title": "MultiDeviceCommandRequest"
+      },
+      "MultiDeviceCommandResponse": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          },
+          "target_device": {
+            "$ref": "#/components/schemas/DeviceTarget"
+          },
+          "command": {
+            "type": "string",
+            "title": "Command",
+            "default": "communication_test"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "accepted": {
+            "type": "boolean",
+            "title": "Accepted"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          },
+          "completed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Completed At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "request_id",
+          "target_device",
+          "status",
+          "accepted",
+          "message",
+          "completed_at"
+        ],
+        "title": "MultiDeviceCommandResponse"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

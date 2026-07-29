@@ -40,6 +40,7 @@ class MultiDeviceCommandRequest(BaseModel):
     timestamp: datetime
     timeout_ms: int = Field(default=10000, ge=100, le=60000)
 
+    # Ensure every compatibility command carries a syntactically valid UUID.
     @field_validator("request_id")
     @classmethod
     def request_id_must_be_uuid(cls, value: str) -> str:
@@ -47,6 +48,7 @@ class MultiDeviceCommandRequest(BaseModel):
         UUID(value)
         return value
 
+    # Restrict the compatibility endpoint to communication tests.
     @field_validator("command")
     @classmethod
     def command_must_be_communication_test(cls, value: str) -> str:
@@ -54,6 +56,7 @@ class MultiDeviceCommandRequest(BaseModel):
             raise ValueError("command must be communication_test")
         return value
 
+    # Ensure compatibility requests identify the fake IPC as their source.
     @field_validator("source")
     @classmethod
     def source_must_be_fake_ipc(cls, value: str) -> str:
@@ -556,6 +559,7 @@ class MachineSnapshot(BaseModel):
 # API serialization
 # ============================================================
 
+# Convert an integer enum into the public value/name representation.
 def enum_to_api(value: IntEnum):
     names = {
         "NoneDevice": "None",
@@ -573,6 +577,7 @@ def enum_to_api(value: IntEnum):
     }
 
 
+# Recursively serialize models, enums, dictionaries, and lists for the API.
 def serialize_api(obj: Any):
     if isinstance(obj, IntEnum):
         return enum_to_api(obj)
