@@ -276,6 +276,7 @@ class FakeIPC(QMainWindow):
         self.setStyleSheet(
             """
             QWidget#central { background: #f4f5f7; color: #20242a; }
+            QLabel { color: #20242a; }
             QLabel#title { font-size: 28px; font-weight: 700; }
             QLabel#sectionTitle { font-size: 16px; font-weight: 700; }
             QLabel#apiUnavailable { color: #b42318; font-weight: 700; }
@@ -297,7 +298,17 @@ class FakeIPC(QMainWindow):
                 padding: 7px 12px; font-weight: 600;
             }
             QComboBox, QLineEdit, QPlainTextEdit {
-                background: white; border: 1px solid #9da3aa; padding: 7px;
+                background: white;
+                color: #20242a;
+                border: 1px solid #9da3aa;
+                padding: 7px;
+            }
+            QComboBox QAbstractItemView {
+                background: white;
+                color: #20242a;
+                selection-background-color: #dbe9f8;
+                selection-color: #20242a;
+                border: 1px solid #9da3aa;
             }
             """
         )
