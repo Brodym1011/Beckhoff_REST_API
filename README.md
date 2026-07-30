@@ -87,3 +87,17 @@ In a second PowerShell window:
 ```powershell
 .\.venv\Scripts\python.exe fake_ipc.py
 ```
+
+## Tests
+
+Activate the virtual environment, then run from the project root:
+
+```bash
+python -m pytest source/tests/
+```
+
+### Windows PowerShell
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest source/tests/
+```

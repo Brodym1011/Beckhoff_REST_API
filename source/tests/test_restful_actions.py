@@ -2,6 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from source.main import app
+from source.action_commands import run_action_command
 
 
 client = TestClient(app)
@@ -24,6 +25,7 @@ def test_restful_action_returns_route_fields(
     device_name,
     action,
 ):
+    monkeypatch.setattr("source.device_routing.run_action_command", lambda a: None)
     monkeypatch.setenv(f"MOCK_{device_name.upper()}_DELAY_MS", "0")
 
     response = client.post(f"/api/v1/{device_type}/{device_name}/{action}")
@@ -37,11 +39,64 @@ def test_restful_action_returns_route_fields(
     assert payload["accepted"] is True
 
 
+def test_mapped_command_success_returns_200(monkeypatch):
+    monkeypatch.setattr(
+        "source.device_routing.run_action_command",
+        lambda a: (True, "dispense completed"),
+    )
+    response = client.post("/api/v1/flex/flex_1/dispense")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "completed"
+    assert payload["accepted"] is True
+    assert payload["message"] == "dispense completed"
+
+
+def test_mapped_command_failure_returns_400(monkeypatch):
+    monkeypatch.setattr(
+        "source.device_routing.run_action_command",
+        lambda a: (False, "script exited with code 1"),
+    )
+    response = client.post("/api/v1/flex/flex_1/dispense")
+
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert detail["error_code"] == "ACTION_COMMAND_FAILED"
+    assert "script exited with code 1" in detail["message"]
+
+
+def test_unmapped_action_falls_through_to_mock(monkeypatch):
+    monkeypatch.setattr("source.device_routing.run_action_command", lambda a: None)
+    monkeypatch.setenv("MOCK_FLEX_1_DELAY_MS", "0")
+
+    response = client.post("/api/v1/flex/flex_1/dispense")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "completed"
+
+
 def test_action_must_match_device_type():
     response = client.post("/api/v1/flex/flex_1/open_door")
 
     assert response.status_code == 404
     assert response.json()["detail"]["error_code"] == "UNSUPPORTED_ACTION"
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "/api/v1/flex/flex_1/force_fail",
+        "/api/v1/arm/static_arm/force_fail",
+        "/api/v1/plc/plc/force_fail",
+    ],
+)
+def test_force_fail_returns_400_for_all_device_types(url):
+    response = client.post(url)
+
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert detail["error_code"] == "ACTION_COMMAND_FAILED"
 
 
 def test_device_name_must_match_device_type():
@@ -68,10 +123,13 @@ def test_each_action_has_an_individual_fastapi_function():
     assert {
         "flex_dispense",
         "flex_drop_tip",
+        "flex_force_fail",
         "arm_grab_sample",
         "arm_drop_sample",
+        "arm_force_fail",
         "plc_open_door",
         "plc_close_door",
+        "plc_force_fail",
     }.issubset(action_functions)
 
 
@@ -146,3 +204,49 @@ def test_device_names_cannot_be_used_under_another_type(
     payload = response.json()["detail"]
     assert payload["error_code"] == "UNKNOWN_DEVICE"
     assert wrong_name in payload["message"]
+
+
+# ============================================================
+# action_commands unit tests
+# ============================================================
+
+import sys
+
+
+def test_run_action_command_runs_mapped_command(monkeypatch, tmp_path):
+    config = tmp_path / "action_commands.json"
+    config.write_text(f'{{"dispense": ["{sys.executable}", "-c", "print(\\"dispense ok\\")"]}}' )
+    monkeypatch.setenv("ACTION_COMMANDS_FILE", str(config))
+
+    success, message = run_action_command("dispense")
+    assert success is True
+    assert message == "dispense ok"
+
+
+def test_run_action_command_returns_none_when_not_mapped(monkeypatch, tmp_path):
+    config = tmp_path / "action_commands.json"
+    config.write_text("{}")
+    monkeypatch.setenv("ACTION_COMMANDS_FILE", str(config))
+
+    assert run_action_command("dispense") is None
+
+
+def test_run_action_command_returns_failure_on_nonzero_exit(monkeypatch, tmp_path):
+    config = tmp_path / "action_commands.json"
+    config.write_text(f'{{"dispense": ["{sys.executable}", "-c", "import sys; print(\\"hardware fault\\", file=sys.stderr); sys.exit(1)"]}}' )
+    monkeypatch.setenv("ACTION_COMMANDS_FILE", str(config))
+
+    success, message = run_action_command("dispense")
+    assert success is False
+    assert "hardware fault" in message
+
+
+def test_run_action_command_uses_default_message_when_stdout_is_empty(monkeypatch, tmp_path):
+    config = tmp_path / "action_commands.json"
+    config.write_text(f'{{"dispense": ["{sys.executable}", "-c", "pass"]}}')
+    monkeypatch.setenv("ACTION_COMMANDS_FILE", str(config))
+
+    success, message = run_action_command("dispense")
+    assert success is True
+    assert message == "dispense completed"
+

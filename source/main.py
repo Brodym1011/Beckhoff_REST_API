@@ -1,17 +1,25 @@
+import logging
+import os
+
 from fastapi import FastAPI, HTTPException, status
+
+logging.basicConfig(
+    level=os.getenv("LOG_LEVEL", "INFO").upper(),
+    format="%(asctime)s %(levelname)-8s %(name)s: %(message)s",
+)
 
 try:
     from .backend_base import MachineBackend
     from .configuration import BACKEND_MODE
     from .mock_backend import MockBackend
     from .models import *
-    from .device_routing import DEVICE_NAMES, router
+    from .device_routing import DEVICE_NAMES, ActionCommandError, router
 except ImportError:  # pragma: no cover - supports direct script execution
     from backend_base import MachineBackend
     from configuration import BACKEND_MODE
     from mock_backend import MockBackend
     from models import *
-    from device_routing import DEVICE_NAMES, router
+    from device_routing import DEVICE_NAMES, ActionCommandError, router
 
 
 # ============================================================
@@ -349,6 +357,14 @@ def execute_device_action(
     """Shared routing and error normalization for explicit action routes."""
     try:
         return router.route_action(device_type, device_name, action)
+    except ActionCommandError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "error_code": "ACTION_COMMAND_FAILED",
+                "message": str(exc),
+            },
+        ) from exc
     except LookupError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -434,6 +450,39 @@ def plc_open_door(device_name: str):
 )
 def plc_close_door(device_name: str):
     return execute_device_action(DeviceType.plc, device_name, "close_door")
+
+
+# Force a 400 response from a named Flex device.
+@app.post(
+    f"{API_PREFIX}/flex/{{device_name}}/force_fail",
+    response_model=DeviceActionResponse,
+    tags=["Flex Actions"],
+    summary="Force a failure response from a named Flex device",
+)
+def flex_force_fail(device_name: str):
+    return execute_device_action(DeviceType.flex, device_name, "force_fail")
+
+
+# Force a 400 response from a named arm.
+@app.post(
+    f"{API_PREFIX}/arm/{{device_name}}/force_fail",
+    response_model=DeviceActionResponse,
+    tags=["Arm Actions"],
+    summary="Force a failure response from a named arm",
+)
+def arm_force_fail(device_name: str):
+    return execute_device_action(DeviceType.arm, device_name, "force_fail")
+
+
+# Force a 400 response from a named PLC.
+@app.post(
+    f"{API_PREFIX}/plc/{{device_name}}/force_fail",
+    response_model=DeviceActionResponse,
+    tags=["PLC Actions"],
+    summary="Force a failure response from a named PLC",
+)
+def plc_force_fail(device_name: str):
+    return execute_device_action(DeviceType.plc, device_name, "force_fail")
 
 
 # Return standardized 404 details for all unregistered action paths.

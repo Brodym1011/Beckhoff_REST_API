@@ -43,7 +43,7 @@ DEVICE_OPTIONS = {
     "Flex": {
         "api_value": "flex",
         "devices": {"Flex 1": "flex_1", "Flex 2": "flex_2"},
-        "actions": {"Dispense": "dispense", "Drop Tip": "drop_tip"},
+        "actions": {"Dispense": "dispense", "Drop Tip": "drop_tip", "Force Fail": "force_fail"},
     },
     "Arm": {
         "api_value": "arm",
@@ -54,12 +54,13 @@ DEVICE_OPTIONS = {
         "actions": {
             "Grab Sample": "grab_sample",
             "Drop Sample": "drop_sample",
+            "Force Fail": "force_fail",
         },
     },
     "PLC": {
         "api_value": "plc",
         "devices": {"PLC": "plc"},
-        "actions": {"Open Door": "open_door", "Close Door": "close_door"},
+        "actions": {"Open Door": "open_door", "Close Door": "close_door", "Force Fail": "force_fail"},
     },
 }
 

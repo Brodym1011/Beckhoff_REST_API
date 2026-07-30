@@ -1,0 +1,9 @@
+{
+    "dispense":     ["python", "scripts/dispense.py"],
+    "drop_tip":     ["python", "scripts/drop_tip.py"],
+    "grab_sample":  ["python", "scripts/grab_sample.py"],
+    "drop_sample":  ["python", "scripts/drop_sample.py"],
+    "open_door":    ["python", "scripts/open_door.py"],
+    "close_door":   ["python", "scripts/close_door.py"],
+    "force_fail":   ["python", "scripts/force_fail.py"]
+}

@@ -6,6 +6,7 @@ from typing import Protocol
 from uuid import uuid4
 
 try:
+    from .action_commands import run_action_command
     from .models import (
         DeviceActionResponse,
         DeviceTarget,
@@ -14,6 +15,7 @@ try:
         MultiDeviceCommandResponse,
     )
 except ImportError:  # pragma: no cover - supports direct script execution
+    from action_commands import run_action_command
     from models import (
         DeviceActionResponse,
         DeviceTarget,
@@ -21,6 +23,10 @@ except ImportError:  # pragma: no cover - supports direct script execution
         MultiDeviceCommandRequest,
         MultiDeviceCommandResponse,
     )
+
+
+class ActionCommandError(Exception):
+    pass
 
 
 DEVICE_NAMES = {
@@ -38,9 +44,9 @@ DEVICE_NAMES = {
 }
 
 DEVICE_ACTIONS = {
-    DeviceType.flex: {"dispense", "drop_tip"},
-    DeviceType.arm: {"grab_sample", "drop_sample"},
-    DeviceType.plc: {"open_door", "close_door"},
+    DeviceType.flex: {"dispense", "drop_tip", "force_fail"},
+    DeviceType.arm: {"grab_sample", "drop_sample", "force_fail"},
+    DeviceType.plc: {"open_door", "close_door", "force_fail"},
 }
 
 
@@ -119,6 +125,23 @@ class CommandRouter:
             raise LookupError("UNKNOWN_DEVICE")
         if action not in DEVICE_ACTIONS[device_type]:
             raise ValueError("UNSUPPORTED_ACTION")
+
+        result = run_action_command(action)
+        if result is not None:
+            success, message = result
+            if not success:
+                raise ActionCommandError(message)
+            return DeviceActionResponse(
+                device_type=device_type,
+                device_name=device_name,
+                action=action,
+                status="completed",
+                accepted=True,
+                message=message,
+                request_id=str(uuid4()),
+                error_code=None,
+                completed_at=datetime.now(timezone.utc),
+            )
 
         adapter = self.registry.get(target)
         outcome = os.getenv(
