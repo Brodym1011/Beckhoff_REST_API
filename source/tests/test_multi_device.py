@@ -131,7 +131,7 @@ def test_ipc_device_and_action_options_match_api_contract():
         "Flex": {
             "api_value": "flex",
             "devices": {"Flex 1": "flex_1", "Flex 2": "flex_2"},
-            "actions": {"Dispense": "dispense", "Drop Tip": "drop_tip"},
+            "actions": {"Dispense": "dispense", "Drop Tip": "drop_tip", "Force Fail": "force_fail"},
         },
         "Arm": {
             "api_value": "arm",
@@ -142,6 +142,7 @@ def test_ipc_device_and_action_options_match_api_contract():
             "actions": {
                 "Grab Sample": "grab_sample",
                 "Drop Sample": "drop_sample",
+                "Force Fail": "force_fail",
             },
         },
         "PLC": {
@@ -150,6 +151,7 @@ def test_ipc_device_and_action_options_match_api_contract():
             "actions": {
                 "Open Door": "open_door",
                 "Close Door": "close_door",
+                "Force Fail": "force_fail",
             },
         },
     }

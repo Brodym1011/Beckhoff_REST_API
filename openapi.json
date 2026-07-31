@@ -743,6 +743,132 @@
         }
       }
     },
+    "/api/v1/flex/{device_name}/force_fail": {
+      "post": {
+        "tags": [
+          "Flex Actions"
+        ],
+        "summary": "Force a failure response from a named Flex device",
+        "operationId": "flex_force_fail_api_v1_flex__device_name__force_fail_post",
+        "parameters": [
+          {
+            "name": "device_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Device Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceActionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/arm/{device_name}/force_fail": {
+      "post": {
+        "tags": [
+          "Arm Actions"
+        ],
+        "summary": "Force a failure response from a named arm",
+        "operationId": "arm_force_fail_api_v1_arm__device_name__force_fail_post",
+        "parameters": [
+          {
+            "name": "device_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Device Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceActionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/plc/{device_name}/force_fail": {
+      "post": {
+        "tags": [
+          "PLC Actions"
+        ],
+        "summary": "Force a failure response from a named PLC",
+        "operationId": "plc_force_fail_api_v1_plc__device_name__force_fail_post",
+        "parameters": [
+          {
+            "name": "device_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Device Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceActionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/machine/snapshot": {
       "get": {
         "tags": [
@@ -1260,7 +1386,6 @@
             "title": "Command"
           },
           "parameters": {
-            "additionalProperties": true,
             "type": "object",
             "title": "Parameters"
           },
@@ -1368,13 +1493,6 @@
           "type": {
             "type": "string",
             "title": "Error Type"
-          },
-          "input": {
-            "title": "Input"
-          },
-          "ctx": {
-            "type": "object",
-            "title": "Context"
           }
         },
         "type": "object",
