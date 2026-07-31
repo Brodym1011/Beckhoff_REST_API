@@ -47,7 +47,7 @@ On minimal Debian or Ubuntu installations, install the Qt runtime libraries:
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y libegl1 libxkbcommon-x11-0
+sudo apt-get install -y libegl1 libgl1 libxkbcommon-x11-0 libxcb-cursor0
 ```
 
 ## Start
